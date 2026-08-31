@@ -1,0 +1,29 @@
+{
+  "name": "qa-prototype",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "plan": "tsx src/cli/generate-plan.ts",
+    "baseline": "tsx src/cli/generate-baseline.ts",
+    "run:test": "tsx src/cli/run-test.ts",
+    "probe": "tsx src/tools/probe.ts",
+    "drill": "tsx src/tools/fault-drill.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Self-healing automated QA prototype",
+  "dependencies": {
+    "@google/genai": "^2.19.0",
+    "dotenv": "^17.4.2",
+    "playwright": "^1.62.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}

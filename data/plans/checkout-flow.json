@@ -1,0 +1,91 @@
+{
+  "planId": "checkout-flow",
+  "createdAt": "2026-08-30T08:21:09.195Z",
+  "model": "gemini-3.6-flash",
+  "source": {
+    "targetUrl": "http://localhost:3000",
+    "instruction": "Log in with my test account, view the product on the home page, and proceed to checkout."
+  },
+  "plan": {
+    "name": "Log in and Proceed to Checkout",
+    "description": "Log in with test credentials, verify product display on the home page, and proceed to checkout.",
+    "steps": [
+      {
+        "id": "step-1",
+        "intent": "Fill in the login email address.",
+        "sourcePhrase": "Log in with my test account",
+        "action": "fill",
+        "target": {
+          "description": "email input field",
+          "context": "login form"
+        },
+        "value": null,
+        "valueRef": "TEST_EMAIL",
+        "expectedOutcome": null
+      },
+      {
+        "id": "step-2",
+        "intent": "Fill in the login password.",
+        "sourcePhrase": "Log in with my test account",
+        "action": "fill",
+        "target": {
+          "description": "password input field",
+          "context": "login form"
+        },
+        "value": null,
+        "valueRef": "TEST_PASSWORD",
+        "expectedOutcome": null
+      },
+      {
+        "id": "step-3",
+        "intent": "Click the log in button to submit credentials.",
+        "sourcePhrase": "Log in with my test account",
+        "action": "click",
+        "target": {
+          "description": "log in button",
+          "context": "login form"
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedOutcome": {
+          "description": "user is logged in and home page is visible"
+        }
+      },
+      {
+        "id": "step-4",
+        "intent": "Verify product is visible on the home page.",
+        "sourcePhrase": "view the product on the home page",
+        "action": "assert",
+        "target": {
+          "description": "product card",
+          "context": "home page"
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedOutcome": {
+          "description": "the product is visible on the home page"
+        }
+      },
+      {
+        "id": "step-5",
+        "intent": "Click to proceed to checkout.",
+        "sourcePhrase": "proceed to checkout",
+        "action": "click",
+        "target": {
+          "description": "proceed to checkout button",
+          "context": null
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedOutcome": {
+          "description": "the checkout interface is displayed"
+        }
+      }
+    ],
+    "startUrl": "http://localhost:3000",
+    "requiredValueRefs": [
+      "TEST_EMAIL",
+      "TEST_PASSWORD"
+    ]
+  }
+}

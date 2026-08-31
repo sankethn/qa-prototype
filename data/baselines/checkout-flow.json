@@ -1,0 +1,343 @@
+{
+  "baselineId": "checkout-flow",
+  "planId": "checkout-flow",
+  "createdAt": "2026-08-30T09:21:32.209Z",
+  "model": "gemini-3.6-flash",
+  "startUrl": "http://localhost:3000",
+  "steps": [
+    {
+      "stepId": "step-1",
+      "intent": "Fill in the login email address.",
+      "action": "fill",
+      "value": null,
+      "valueRef": "TEST_EMAIL",
+      "pageUrl": "http://localhost:3000/",
+      "locator": {
+        "strategy": "role",
+        "value": null,
+        "role": "textbox",
+        "name": "Email",
+        "nth": null
+      },
+      "fallbackLocators": [
+        {
+          "strategy": "label",
+          "value": "Email",
+          "role": null,
+          "name": null,
+          "nth": null
+        },
+        {
+          "strategy": "css",
+          "value": "#email",
+          "role": null,
+          "name": null,
+          "nth": null
+        }
+      ],
+      "fingerprint": {
+        "role": "textbox",
+        "tagName": "input",
+        "accessibleName": "Email",
+        "text": "",
+        "ariaLabel": null,
+        "id": "email",
+        "testId": null,
+        "nameAttr": null,
+        "inputType": "text",
+        "placeholder": null,
+        "context": "Sign in",
+        "nearbyText": [
+          "Sign in",
+          "Test app — any email and password works.",
+          "Email",
+          "Password"
+        ]
+      },
+      "expectedOutcome": {
+        "type": "inputFilled",
+        "value": null,
+        "locator": {
+          "strategy": "role",
+          "value": null,
+          "role": "textbox",
+          "name": "Email",
+          "nth": null
+        },
+        "intended": null
+      },
+      "resolution": {
+        "confidence": 1,
+        "reason": "Element s0e0 is the text input field for the Email address in the Sign in form."
+      },
+      "healHistory": []
+    },
+    {
+      "stepId": "step-2",
+      "intent": "Fill in the login password.",
+      "action": "fill",
+      "value": null,
+      "valueRef": "TEST_PASSWORD",
+      "pageUrl": "http://localhost:3000/",
+      "locator": {
+        "strategy": "role",
+        "value": null,
+        "role": "textbox",
+        "name": "Password",
+        "nth": null
+      },
+      "fallbackLocators": [
+        {
+          "strategy": "label",
+          "value": "Password",
+          "role": null,
+          "name": null,
+          "nth": null
+        },
+        {
+          "strategy": "css",
+          "value": "#password",
+          "role": null,
+          "name": null,
+          "nth": null
+        }
+      ],
+      "fingerprint": {
+        "role": "textbox",
+        "tagName": "input",
+        "accessibleName": "Password",
+        "text": "",
+        "ariaLabel": null,
+        "id": "password",
+        "testId": null,
+        "nameAttr": null,
+        "inputType": "password",
+        "placeholder": null,
+        "context": "Sign in",
+        "nearbyText": [
+          "Sign in",
+          "Test app — any email and password works.",
+          "Email",
+          "Password"
+        ]
+      },
+      "expectedOutcome": {
+        "type": "inputFilled",
+        "value": null,
+        "locator": {
+          "strategy": "role",
+          "value": null,
+          "role": "textbox",
+          "name": "Password",
+          "nth": null
+        },
+        "intended": null
+      },
+      "resolution": {
+        "confidence": 1,
+        "reason": "Element s1e1 is a password input field within the Sign in form."
+      },
+      "healHistory": []
+    },
+    {
+      "stepId": "step-3",
+      "intent": "Click the log in button to submit credentials.",
+      "action": "click",
+      "value": null,
+      "valueRef": null,
+      "pageUrl": "http://localhost:3000/",
+      "locator": {
+        "strategy": "role",
+        "value": null,
+        "role": "button",
+        "name": "Sign in",
+        "nth": null
+      },
+      "fallbackLocators": [
+        {
+          "strategy": "text",
+          "value": "Sign in",
+          "role": null,
+          "name": null,
+          "nth": 1
+        }
+      ],
+      "fingerprint": {
+        "role": "button",
+        "tagName": "button",
+        "accessibleName": "Sign in",
+        "text": "Sign in",
+        "ariaLabel": null,
+        "id": null,
+        "testId": null,
+        "nameAttr": null,
+        "inputType": "submit",
+        "placeholder": null,
+        "context": "Sign in",
+        "nearbyText": [
+          "Test app — any email and password works.",
+          "Email",
+          "Password"
+        ]
+      },
+      "expectedOutcome": {
+        "type": "urlContains",
+        "value": "/home",
+        "locator": null,
+        "intended": "user is logged in and home page is visible"
+      },
+      "resolution": {
+        "confidence": 0.98,
+        "reason": "The 'Sign in' button with type='submit' is the primary button in the login form used to submit credentials."
+      },
+      "healHistory": []
+    },
+    {
+      "stepId": "step-4",
+      "intent": "Verify product is visible on the home page.",
+      "action": "assert",
+      "value": null,
+      "valueRef": null,
+      "pageUrl": "http://localhost:3000/home",
+      "locator": {
+        "strategy": "role",
+        "value": null,
+        "role": "heading",
+        "name": "Test Widget",
+        "nth": null
+      },
+      "fallbackLocators": [
+        {
+          "strategy": "text",
+          "value": "Test Widget",
+          "role": null,
+          "name": null,
+          "nth": null
+        }
+      ],
+      "fingerprint": {
+        "role": "heading",
+        "tagName": "h1",
+        "accessibleName": "Test Widget",
+        "text": "Test Widget",
+        "ariaLabel": null,
+        "id": null,
+        "testId": null,
+        "nameAttr": null,
+        "inputType": null,
+        "placeholder": null,
+        "context": "Test Widget",
+        "nearbyText": [
+          "📦",
+          "A single placeholder product for testing the checkout flow.",
+          "$49.00",
+          "Checkout"
+        ]
+      },
+      "expectedOutcome": {
+        "type": "elementVisible",
+        "value": null,
+        "locator": {
+          "strategy": "role",
+          "value": null,
+          "role": "heading",
+          "name": "Test Widget",
+          "nth": null
+        },
+        "intended": "the product is visible on the home page"
+      },
+      "resolution": {
+        "confidence": 0.95,
+        "reason": "Element s3e1 is the heading for the product card 'Test Widget', confirming the product is visible on the home page."
+      },
+      "healHistory": []
+    },
+    {
+      "stepId": "step-5",
+      "intent": "Click to proceed to checkout.",
+      "action": "click",
+      "value": null,
+      "valueRef": null,
+      "pageUrl": "http://localhost:3000/home",
+      "locator": {
+        "strategy": "role",
+        "value": null,
+        "role": "link",
+        "name": "Continue to Payment",
+        "nth": null
+      },
+      "fallbackLocators": [
+        {
+          "strategy": "text",
+          "value": "Continue to Payment",
+          "role": null,
+          "name": null,
+          "nth": null
+        }
+      ],
+      "fingerprint": {
+        "role": "link",
+        "tagName": "a",
+        "accessibleName": "Continue to Payment",
+        "text": "Continue to Payment",
+        "ariaLabel": null,
+        "id": null,
+        "testId": null,
+        "nameAttr": null,
+        "inputType": null,
+        "placeholder": null,
+        "context": "Test Widget",
+        "nearbyText": [
+          "📦",
+          "Test Widget",
+          "A single placeholder product for testing the checkout flow.",
+          "$49.00"
+        ]
+      },
+      "expectedOutcome": {
+        "type": "urlContains",
+        "value": "/checkout",
+        "locator": null,
+        "intended": "the checkout interface is displayed"
+      },
+      "resolution": {
+        "confidence": 0.98,
+        "reason": "The link named 'Checkout' directly matches the intent to proceed to checkout."
+      },
+      "healHistory": [
+        {
+          "healedAt": "2026-08-30T13:25:53.122Z",
+          "confidence": 0.95,
+          "reason": "The 'Continue to Payment' link replaces 'Checkout' in the Test Widget to initiate the checkout flow.",
+          "model": "gemini-3.6-flash",
+          "previousLocator": {
+            "strategy": "role",
+            "value": null,
+            "role": "link",
+            "name": "Checkout",
+            "nth": null
+          },
+          "previousFingerprint": {
+            "role": "link",
+            "tagName": "a",
+            "accessibleName": "Checkout",
+            "text": "Checkout",
+            "ariaLabel": null,
+            "id": null,
+            "testId": null,
+            "nameAttr": null,
+            "inputType": null,
+            "placeholder": null,
+            "context": "Test Widget",
+            "nearbyText": [
+              "📦",
+              "Test Widget",
+              "A single placeholder product for testing the checkout flow.",
+              "$49.00"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

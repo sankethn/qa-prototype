@@ -9,7 +9,8 @@
     "run:test": "tsx src/cli/run-test.ts",
     "probe": "tsx src/tools/probe.ts",
     "drill": "tsx src/tools/fault-drill.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",

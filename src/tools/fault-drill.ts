@@ -74,7 +74,13 @@ const DRILLS: Drill[] = [
     expect: 'OUTCOME_NOT_MET, NOT healable',
     mutate: (base) => {
       const b = clone(base);
-      b.steps[2]!.expectedOutcome.value = '/dashboard';
+      // Break the URL assertion only — the element and the click are untouched,
+      // which is what makes this a business regression rather than a stale test.
+      const urlAssertion = b.steps[2]!.expectedOutcome.assertions.find(
+        (a) => a.type === 'urlContains',
+      );
+      if (!urlAssertion) throw new Error('step-3 has no urlContains assertion to break');
+      urlAssertion.value = '/dashboard';
       return b;
     },
     check: expectStepFailure('OUTCOME_NOT_MET', false),
@@ -105,6 +111,20 @@ const DRILLS: Drill[] = [
       return b;
     },
     check: expectStepFailure('HTTP_ERROR', false),
+  },
+
+  {
+    // Stands in for the general case: an expired session bouncing us to /login,
+    // an unexpected redirect, or an earlier step ending somewhere unintended.
+    // Every element goes missing, which without this check reads as a rename.
+    name: 'Browser is not on the page the step was recorded against',
+    expect: 'PAGE_DIVERGED, NOT healable',
+    mutate: (base) => {
+      const b = clone(base);
+      b.steps[1]!.pageUrl = 'http://localhost:3000/some-other-page';
+      return b;
+    },
+    check: expectStepFailure('PAGE_DIVERGED', false),
   },
 
   // --- Healing drills. These call the model, so they need --heal. ------------

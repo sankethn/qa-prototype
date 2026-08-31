@@ -67,19 +67,21 @@ async function main() {
 
   console.log('\nBaseline recorded:\n');
   for (const step of baseline.steps) {
-    const outcome = step.expectedOutcome;
-    const assertion =
-      outcome.type === 'elementVisible' && outcome.locator
-        ? `elementVisible ${describeLocator(outcome.locator)}`
-        : outcome.value
-          ? `${outcome.type} "${outcome.value}"`
-          : outcome.type;
     const target = step.locator ? describeLocator(step.locator) : '(no element — acts on the page)';
     console.log(`  ${step.stepId}  ${step.action.padEnd(8)} ${target}`);
-    console.log(`            assert: ${assertion}`);
+
+    const { assertions } = step.expectedOutcome;
+    if (assertions.length === 0) {
+      console.log('            assert: none');
+    }
+    for (const assertion of assertions) {
+      const subject = assertion.locator ? ` ${describeLocator(assertion.locator)}` : '';
+      const value = assertion.value ? ` "${assertion.value}"` : '';
+      console.log(`            assert: ${assertion.type}${value}${subject}`);
+    }
   }
 
-  const unverifiable = baseline.steps.filter((s) => s.expectedOutcome.type === 'none');
+  const unverifiable = baseline.steps.filter((s) => s.expectedOutcome.assertions.length === 0);
   if (unverifiable.length > 0) {
     console.log(
       `\n${unverifiable.length} step(s) have no post-condition: ${unverifiable.map((s) => s.stepId).join(', ')}`,

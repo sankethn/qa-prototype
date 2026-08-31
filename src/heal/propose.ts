@@ -87,7 +87,13 @@ export async function proposeHeal({
     '',
     'EXPECTED OUTCOME OF THIS STEP',
     `  ${outcome.intended ?? '(no description recorded)'}`,
-    `  checked as: ${outcome.type}${outcome.value ? ` "${outcome.value}"` : ''}`,
+    // Every assertion is listed: the candidate will be judged against all of
+    // them, so the model should know what the replacement has to achieve.
+    outcome.assertions.length === 0
+      ? '  checked as: nothing (no post-condition was recordable)'
+      : `  checked as: ${outcome.assertions
+          .map((a) => (a.value ? `${a.type} "${a.value}"` : a.type))
+          .join(' AND ')}`,
     '',
     'CURRENT ELEMENTS ON THE PAGE',
     renderElementsForPrompt(snapshot),

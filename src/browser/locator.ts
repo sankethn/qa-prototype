@@ -27,6 +27,14 @@ function resolveStrategy(page: Page, locator: Locator): PlaywrightLocator {
       });
     case 'label':
       return page.getByLabel(value, { exact: true });
+    case 'labelledBy':
+      // XPath because no built-in locator expresses "the sibling after the
+      // element whose text is X". `text()` rather than `.` restricts the match
+      // to the label's own text, so a wrapper that merely contains the label
+      // does not match. Quotes are excluded when the anchor is recorded.
+      return page.locator(
+        `xpath=//*[normalize-space(text())="${value}"]/following-sibling::*[1]`,
+      );
     case 'placeholder':
       return page.getByPlaceholder(value, { exact: true });
     case 'altText':
@@ -42,7 +50,9 @@ export function describeLocator(locator: Locator): string {
   const base =
     locator.strategy === 'role'
       ? `role=${locator.role}[name="${locator.name ?? ''}"]`
-      : `${locator.strategy}="${locator.value ?? ''}"`;
+      : locator.strategy === 'labelledBy'
+        ? `after label "${locator.value ?? ''}"`
+        : `${locator.strategy}="${locator.value ?? ''}"`;
   return locator.nth === null ? base : `${base} >> nth=${locator.nth}`;
 }
 
@@ -66,6 +76,12 @@ export function deriveLocatorCandidates(element: ExtractedElement): Locator[] {
   }
   if (element.labelText) {
     add({ strategy: 'label', value: element.labelText, role: null, name: null });
+  }
+  // Ranked above every content-derived strategy. For a value element this is the
+  // only candidate whose identity survives the value changing, so it must beat
+  // the element's own text even though text would also match today.
+  if (element.labelAnchor) {
+    add({ strategy: 'labelledBy', value: element.labelAnchor, role: null, name: null });
   }
   if (element.placeholder) {
     add({ strategy: 'placeholder', value: element.placeholder, role: null, name: null });
@@ -115,7 +131,8 @@ export async function resolveLocators(
   element: ExtractedElement,
 ): Promise<ResolvedLocators | null> {
   const candidates = deriveLocatorCandidates(element);
-  const verified: Locator[] = [];
+  const unique: Locator[] = [];
+  const positional: Locator[] = [];
 
   for (const candidate of candidates) {
     const locator = buildLocator(page, candidate);
@@ -123,16 +140,20 @@ export async function resolveLocators(
     if (count === 0) continue;
 
     if (count === 1) {
-      if (await matchesRef(locator, element.ref)) verified.push(candidate);
+      if (await matchesRef(locator, element.ref)) unique.push(candidate);
       continue;
     }
 
-    // Ambiguous on its own. Usable only if our element sits at a known index —
-    // "the first product card" is a legitimate test, "some div" is not.
+    // Ambiguous on its own. Usable only if our element sits at a known index.
     const index = await indexOfRef(locator, count, element.ref);
-    if (index !== null) verified.push({ ...candidate, nth: index });
+    if (index !== null) positional.push({ ...candidate, nth: index });
   }
 
+  // Every unique locator outranks every positional one, even a unique locator
+  // from a weaker strategy. `nth` encodes "the third thing that looks like this",
+  // which says nothing about the element and silently retargets when the page
+  // reorders — a wrong element that still passes is worse than a clean break.
+  const verified = [...unique, ...positional];
   const [primary, ...fallbacks] = verified;
   return primary ? { primary, fallbacks } : null;
 }

@@ -8,13 +8,50 @@ import {
   classifyAppHealth,
   classifyExecutionError,
   classifyLocatorFailure,
+  classifyNotReady,
   classifyOutcomeFailure,
+  classifyPageDivergence,
 } from './classify.js';
+import { checkQuiescence } from '../browser/quiescence.js';
 import { HealthMonitor } from './health.js';
 import { verifyOutcome } from './verify.js';
 import type { RunResult, StepFailure, StepResult } from './types.js';
 
-const ATTACH_TIMEOUT = 3000;
+/** Longest we keep retrying a missing element while the page still looks busy. */
+const NOT_READY_BUDGET = 10_000;
+/** Pause between retries while waiting for a busy page. */
+const RETRY_INTERVAL = 300;
+
+/**
+ * Compares two URLs by shape, so a dynamic path segment does not read as a
+ * divergence. `/orders/12345` and `/orders/67890` are the same page; `/home` and
+ * `/login` are not. Query strings and hashes are ignored — they carry tracking
+ * params and cache-busters that differ run to run.
+ */
+export function samePageShape(a: string, b: string): boolean {
+  const shape = (raw: string): string | null => {
+    try {
+      const url = new URL(raw);
+      const path = url.pathname
+        .split('/')
+        .map((segment) =>
+          /^\d+$/.test(segment) ||
+          /^[0-9a-f]{8,}$/i.test(segment) ||
+          /^[0-9a-f-]{20,}$/i.test(segment)
+            ? ':id'
+            : segment,
+        )
+        .join('/');
+      return `${url.origin}${path.replace(/\/$/, '')}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const left = shape(a);
+  const right = shape(b);
+  return left === null || right === null ? true : left === right;
+}
 
 export type RunEvent =
   | { type: 'step'; result: StepResult }
@@ -305,15 +342,26 @@ async function runStep(
   const finish = (patch: Partial<StepResult>): StepResult =>
     ({ ...base, status: 'passed', failure: null, ...patch, durationMs: Date.now() - startedAt }) as StepResult;
 
+  // Checked before the element is looked for. `navigate` is exempt: it goes to an
+  // absolute URL and so does not care where the browser currently is.
+  if (step.action !== 'navigate' && !samePageShape(step.pageUrl, page.url())) {
+    return finish({
+      status: 'failed',
+      failure: classifyPageDivergence(monitor.snapshot(), step.pageUrl, page.url()),
+    });
+  }
+
   // Steps that act on the page rather than an element have no locator to resolve.
   const found = step.locator
-    ? await findElement(page, step)
+    ? await findElement(page, step, monitor)
     : ({ locator: null, used: null, usedFallback: false } as const);
 
   if ('failure' in found) {
     return finish({
       status: 'failed',
-      failure: classifyLocatorFailure(monitor.snapshot(), found.matchCount, found.detail),
+      failure: found.busyReason
+        ? classifyNotReady(monitor.snapshot(), found.busyReason, found.waitedMs)
+        : classifyLocatorFailure(monitor.snapshot(), found.matchCount, found.detail),
     });
   }
 
@@ -377,10 +425,23 @@ interface NotFound {
   failure: true;
   matchCount: number;
   detail: string;
+  /** Set when the page still looked busy — the element may simply not have arrived. */
+  busyReason: string | null;
+  waitedMs: number;
 }
 
 /**
- * Tries the primary locator, then each fallback in order.
+ * Tries the primary locator, then each fallback in order, retrying while the
+ * page still looks busy.
+ *
+ * The retry loop is not about patience, it is about attribution. A missing
+ * element on a settled page is a stale locator and worth healing; a missing
+ * element on a page that is still fetching and rendering is a timeout. Without
+ * this distinction, a slow API turns into a heal attempt against loading
+ * skeletons — and a healer given skeletons will find one that looks plausible.
+ *
+ * So the loop exits the moment the page looks settled, however little time has
+ * passed, and only keeps waiting while there is positive evidence of work.
  *
  * A fallback rescuing the step is reported rather than silently accepted: the
  * test still passes, but the baseline has drifted and is one more change away
@@ -389,31 +450,43 @@ interface NotFound {
 export async function findElement(
   page: Page,
   step: BaselineStep,
+  monitor?: HealthMonitor,
 ): Promise<FoundElement | NotFound> {
   const primary = step.locator;
   if (!primary) return { locator: null, used: null, usedFallback: false };
 
   const candidates = [primary, ...step.fallbackLocators];
+  const startedAt = Date.now();
   let primaryCount = 0;
+  let busy: { busy: boolean; reason: string | null } = { busy: false, reason: null };
 
-  for (const [index, candidate] of candidates.entries()) {
-    const locator = buildLocator(page, candidate);
+  for (;;) {
+    for (const [index, candidate] of candidates.entries()) {
+      const count = await countOf(page, candidate);
+      if (index === 0) primaryCount = count;
 
-    if (index === 0) {
-      // Give an SPA a moment to render before declaring the element missing.
-      await locator
-        .first()
-        .waitFor({ state: 'attached', timeout: ATTACH_TIMEOUT })
-        .catch(() => {});
+      const matched = candidate.nth === null ? count === 1 : count > candidate.nth;
+      if (matched) {
+        return {
+          locator: buildLocator(page, candidate),
+          used: candidate,
+          usedFallback: index > 0,
+        };
+      }
     }
 
-    const count = await countOf(page, candidate);
-    if (index === 0) primaryCount = count;
+    const waited = Date.now() - startedAt;
+    if (waited >= NOT_READY_BUDGET) break;
 
-    const expected = candidate.nth === null ? count === 1 : count > candidate.nth;
-    if (expected) {
-      return { locator, used: candidate, usedFallback: index > 0 };
-    }
+    busy = await checkQuiescence(page, {
+      inFlightRequests: monitor?.snapshot().inFlightRequests ?? 0,
+    }).catch(() => ({ busy: false, reason: null }));
+
+    // Settled and still missing: the locator is genuinely stale. Stop straight
+    // away rather than burning the whole budget on a page that will not change.
+    if (!busy.busy) break;
+
+    await page.waitForTimeout(RETRY_INTERVAL);
   }
 
   const tried = candidates.map(describeLocator).join(', ');
@@ -425,6 +498,8 @@ export async function findElement(
     failure: true,
     matchCount: primaryCount,
     detail: `Tried: ${tried}.${was}`,
+    busyReason: busy.busy ? busy.reason : null,
+    waitedMs: Date.now() - startedAt,
   };
 }
 

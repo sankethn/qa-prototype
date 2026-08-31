@@ -9,7 +9,7 @@ import { actsOnElement, type IntentPlan, type IntentStep } from '../intent/types
 import type { ResolvedLocators } from '../browser/locator.js';
 import { deriveOutcome } from './outcome.js';
 import { resolveStep } from './resolve.js';
-import type { Baseline, BaselineStep } from './types.js';
+import type { Baseline, BaselineOutcome, BaselineStep } from './types.js';
 
 /** Below this, the model is guessing and we would be baking a guess into a baseline. */
 export const RESOLUTION_THRESHOLD = 0.7;
@@ -62,6 +62,7 @@ export async function generateBaseline({
       elementCount: snapshot.elements.length,
       truncated: snapshot.truncated,
     });
+    warnIfUnreachable(snapshot, onEvent);
 
     for (const step of plan.steps) {
       // `navigate` acts on the page, not an element, so there is nothing to
@@ -95,6 +96,20 @@ export async function generateBaseline({
           locator: describeLocator(resolved.primary),
           fallbacks: resolved.fallbacks.length,
         });
+
+        // A positional locator is only honest when the tester asked for a
+        // position. Otherwise `nth` records an accident of the current page, and
+        // a later reorder retargets the step silently instead of failing.
+        if (resolved.primary.nth !== null && !isOrdinalIntent(step)) {
+          onEvent?.({
+            type: 'warning',
+            stepId: step.id,
+            message:
+              `Locator falls back to position (${describeLocator(resolved.primary)}) but the step ` +
+              'does not ask for a specific one. If the page reorders, this will point at a ' +
+              'different element and still pass. A test id on the target would remove the ambiguity.',
+          });
+        }
       }
 
       const value = step.valueRef ? resolveValueRef(step.valueRef) : step.value;
@@ -118,6 +133,7 @@ export async function generateBaseline({
         page,
         action: step.action,
         stepLocator: resolved?.primary ?? null,
+        expectedValue: step.expectedValue,
         intended: step.expectedOutcome?.description ?? null,
         urlBefore,
         urlAfter: page.url(),
@@ -125,7 +141,7 @@ export async function generateBaseline({
         after,
       });
 
-      if (outcome.type === 'none') {
+      if (outcome.assertions.length === 0) {
         onEvent?.({
           type: 'warning',
           stepId: step.id,
@@ -223,8 +239,51 @@ async function resolveElement({
   return { element, resolution, model };
 }
 
-function describeOutcome(outcome: { type: string; value: string | null }): string {
-  return outcome.value ? `${outcome.type} "${outcome.value}"` : outcome.type;
+/**
+ * Says so when the page has regions the extractor cannot enter. Silence here
+ * would be misleading: a baseline against a page whose real controls live in an
+ * iframe or a shadow root looks complete but cannot see, resolve or heal them.
+ */
+function warnIfUnreachable(
+  snapshot: PageSnapshot,
+  onEvent?: (event: BaselineEvent) => void,
+): void {
+  const { iframes, shadowRoots } = snapshot.unreachable;
+  if (iframes === 0 && shadowRoots === 0) return;
+
+  const parts: string[] = [];
+  if (iframes > 0) parts.push(`${iframes} iframe(s)`);
+  if (shadowRoots > 0) parts.push(`${shadowRoots} shadow root(s)`);
+
+  onEvent?.({
+    type: 'warning',
+    stepId: '-',
+    message:
+      `${snapshot.url} contains ${parts.join(' and ')}, which extraction does not enter. ` +
+      'Anything inside is invisible to element matching and to healing.',
+  });
+}
+
+/**
+ * Whether the step itself asks for a particular one of several matches. Only
+ * then is a positional locator recording the tester's intent rather than the
+ * page's current order.
+ */
+const ORDINAL_WORDS =
+  /\b(first|second|third|fourth|fifth|sixth|last|topmost|bottom|1st|2nd|3rd|\d+(?:st|nd|rd|th))\b/i;
+
+function isOrdinalIntent(step: IntentStep): boolean {
+  return ORDINAL_WORDS.test(
+    `${step.intent} ${step.target?.description ?? ''} ${step.target?.context ?? ''}`,
+  );
+}
+
+/** One-line summary of a step's post-condition set, for the record log. */
+function describeOutcome(outcome: BaselineOutcome): string {
+  if (outcome.assertions.length === 0) return 'none';
+  return outcome.assertions
+    .map((a) => (a.value ? `${a.type} "${a.value}"` : a.type))
+    .join(' + ');
 }
 
 export class BaselineError extends Error {

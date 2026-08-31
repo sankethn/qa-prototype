@@ -1,0 +1,107 @@
+{
+  "baselineId": "direct-checkout",
+  "planId": "direct-checkout",
+  "createdAt": "2026-08-31T09:10:46.444Z",
+  "model": "gemini-3.6-flash",
+  "startUrl": "http://localhost:3000",
+  "steps": [
+    {
+      "stepId": "step-1",
+      "intent": "Navigate to the checkout page",
+      "action": "navigate",
+      "value": "http://localhost:3000/checkout",
+      "valueRef": null,
+      "pageUrl": "http://localhost:3000/",
+      "locator": null,
+      "fallbackLocators": [],
+      "fingerprint": null,
+      "expectedOutcome": {
+        "assertions": [
+          {
+            "type": "urlContains",
+            "value": "/checkout",
+            "locator": null
+          },
+          {
+            "type": "elementVisible",
+            "value": null,
+            "locator": {
+              "strategy": "role",
+              "value": null,
+              "role": "heading",
+              "name": "Checkout",
+              "nth": null
+            }
+          }
+        ],
+        "intended": "the checkout page is loaded"
+      },
+      "resolution": {
+        "confidence": 1,
+        "reason": "Acts on the page, not an element."
+      },
+      "healHistory": []
+    },
+    {
+      "stepId": "step-2",
+      "intent": "Confirm that the order total is visible on the page",
+      "action": "assert",
+      "value": null,
+      "valueRef": null,
+      "pageUrl": "http://localhost:3000/checkout",
+      "locator": {
+        "strategy": "labelledBy",
+        "value": "Total",
+        "role": null,
+        "name": null,
+        "nth": null
+      },
+      "fallbackLocators": [
+        {
+          "strategy": "text",
+          "value": "$59.00",
+          "role": null,
+          "name": null,
+          "nth": 1
+        }
+      ],
+      "fingerprint": {
+        "role": "generic",
+        "tagName": "span",
+        "accessibleName": "$59.00",
+        "text": "$59.00",
+        "ariaLabel": null,
+        "id": null,
+        "testId": null,
+        "nameAttr": null,
+        "inputType": null,
+        "placeholder": null,
+        "context": "Checkout",
+        "nearbyText": [
+          "Total"
+        ]
+      },
+      "expectedOutcome": {
+        "assertions": [
+          {
+            "type": "elementVisible",
+            "value": null,
+            "locator": {
+              "strategy": "labelledBy",
+              "value": "Total",
+              "role": null,
+              "name": null,
+              "nth": null
+            }
+          }
+        ],
+        "intended": "the order total is displayed"
+      },
+      "resolution": {
+        "confidence": 0.95,
+        "reason": "Element s1e6 displays the order total amount ($59.00) labelled by 'Total'."
+      },
+      "healHistory": []
+    }
+  ]
+}

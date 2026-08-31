@@ -1,0 +1,46 @@
+{
+  "planId": "direct-checkout",
+  "createdAt": "2026-08-31T09:10:19.421Z",
+  "model": "gemini-3.6-flash",
+  "source": {
+    "targetUrl": "http://localhost:3000",
+    "instruction": "Go to http://localhost:3000/checkout and confirm the order total is shown"
+  },
+  "plan": {
+    "name": "Verify Checkout Order Total",
+    "description": "Navigate to the checkout page and verify that the order total is displayed.",
+    "steps": [
+      {
+        "id": "step-1",
+        "intent": "Navigate to the checkout page",
+        "sourcePhrase": "Go to http://localhost:3000/checkout",
+        "action": "navigate",
+        "target": null,
+        "value": "http://localhost:3000/checkout",
+        "valueRef": null,
+        "expectedValue": null,
+        "expectedOutcome": {
+          "description": "the checkout page is loaded"
+        }
+      },
+      {
+        "id": "step-2",
+        "intent": "Confirm that the order total is visible on the page",
+        "sourcePhrase": "confirm the order total is shown",
+        "action": "assert",
+        "target": {
+          "description": "order total element",
+          "context": null
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedValue": null,
+        "expectedOutcome": {
+          "description": "the order total is displayed"
+        }
+      }
+    ],
+    "startUrl": "http://localhost:3000",
+    "requiredValueRefs": []
+  }
+}

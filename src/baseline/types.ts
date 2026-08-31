@@ -11,6 +11,21 @@ export const LOCATOR_STRATEGIES = [
   'testId',
   'role',
   'label',
+  /**
+   * The element sitting immediately after a label, identified by the label's
+   * text rather than its own.
+   *
+   * This is how a *value* gets a stable identity. A displayed total, status or
+   * name has no test id and no accessible name, so the only thing left is its
+   * own content — and anchoring on content means a data change breaks the
+   * locator, arrives as ELEMENT_NOT_FOUND, and gets healed into the new value.
+   * A pricing regression would be indistinguishable from a rename.
+   *
+   * One relationship covers the common markup for label/value pairs:
+   * `<dt>`/`<dd>`, `<label>` and its field, `<th>`/`<td>` in a row, and two
+   * sibling spans. All four are "the next sibling of the labelling element".
+   */
+  'labelledBy',
   'placeholder',
   'altText',
   'text',
@@ -21,7 +36,10 @@ export type LocatorStrategy = (typeof LOCATOR_STRATEGIES)[number];
 
 export const locatorSchema = z.object({
   strategy: z.enum(LOCATOR_STRATEGIES),
-  /** testid / label text / placeholder / alt / visible text / css selector. Null for `role`. */
+  /**
+   * testid / label text / placeholder / alt / visible text / css selector.
+   * For `labelledBy` this is the label's exact text. Null for `role`.
+   */
   value: z.string().nullable(),
   /** `role` strategy only. */
   role: z.string().nullable(),
@@ -65,12 +83,41 @@ export type Fingerprint = z.infer<typeof fingerprintSchema>;
  * honest record that nothing verifiable changed, which is better than inventing
  * an assertion that would pass vacuously.
  */
-export const OUTCOME_TYPES = ['urlContains', 'elementVisible', 'inputFilled', 'none'] as const;
+export const ASSERTION_TYPES = [
+  'urlContains',
+  'elementVisible',
+  /** The element's text is exactly this. Only recorded when the tester named a value. */
+  'textEquals',
+  'inputFilled',
+] as const;
 
-export const expectedOutcomeSchema = z.object({
-  type: z.enum(OUTCOME_TYPES),
+export const assertionSchema = z.object({
+  type: z.enum(ASSERTION_TYPES),
   value: z.string().nullable(),
   locator: locatorSchema.nullable(),
+});
+
+export type Assertion = z.infer<typeof assertionSchema>;
+
+/**
+ * A step's post-condition, as a set of assertions that must all hold.
+ *
+ * A single assertion is too weak to mean much. `urlContains "/checkout"` is
+ * equally true of the real page, a 500 error page served at that path, an SPA
+ * that routed and then rendered an error boundary, and an empty shell. Requiring
+ * the URL *and* something that only exists on the working page turns "we got
+ * there" into "it actually rendered".
+ *
+ * It also separates identity from value. `elementVisible` says the total is on
+ * screen; `textEquals` says what it reads. Keeping the value here rather than in
+ * the locator is what makes a changed price fail as OUTCOME_NOT_MET — a real
+ * failure, never healed — instead of ELEMENT_NOT_FOUND, which would be repaired
+ * into the new price and hide the regression.
+ *
+ * An empty list is an honest record that nothing verifiable changed.
+ */
+export const expectedOutcomeSchema = z.object({
+  assertions: z.array(assertionSchema),
   /** The intent plan's prose expectation, kept for the healer's context. */
   intended: z.string().nullable(),
 });

@@ -118,6 +118,16 @@ export const stepSchema = z.object({
         'Always use this instead of "value" for credentials, emails, and any test data ' +
         'the user did not spell out literally. E.g. TEST_EMAIL, TEST_PASSWORD.',
     ),
+  expectedValue: z
+    .string()
+    .nullable()
+    .describe(
+      'For an "assert" step only: the exact value the tester said the element should ' +
+        'show, copied verbatim from their words. Set this ONLY when they stated a literal ' +
+        'value — "the total is $49.00" gives "$49.00", but "the total is shown" gives null. ' +
+        'Null for every other action. This is the difference between checking that a field ' +
+        'has a value and checking what that value is, so do not infer one.',
+    ),
   expectedOutcome: expectedOutcomeSchema
     .nullable()
     .describe(

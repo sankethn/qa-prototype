@@ -60,7 +60,18 @@ HARD RULES
 8. Step ids are sequential: "step-1", "step-2", "step-3", ...
 
 9. sourcePhrase must be an exact substring of the instruction text. It is checked
-   mechanically, not judged. Copy the words across; do not paraphrase or tidy them.`;
+   mechanically, not judged. Copy the words across; do not paraphrase or tidy them.
+
+10. expectedValue separates "a value is shown" from "the value is X". Set it only on an
+   assert step, and only when the tester wrote the literal value themselves:
+
+     "confirm the order total is shown"     -> expectedValue: null
+     "confirm the total is $49.00"          -> expectedValue: "$49.00"
+     "check the status says Shipped"        -> expectedValue: "Shipped"
+
+   Never infer a value from context or from what you imagine the page shows. A wrong
+   value here turns every future data change into a failed test; a missing one turns a
+   real data regression into a test that still passes.`;
 
 export function buildPrompt(targetUrl: string, instruction: string): string {
   return `Target application: ${targetUrl}

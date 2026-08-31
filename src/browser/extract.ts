@@ -18,7 +18,15 @@ export interface ExtractedElement {
   altText: string | null;
   context: string | null;
   nearbyText: string[];
+  /**
+   * Exact text of the element that labels this one, when this element is the
+   * value half of a label/value pair. Gives a value element an identity that
+   * does not depend on its own content.
+   */
+  labelAnchor: string | null;
   interactive: boolean;
+  /** Collected only for its text — a plausible assertion target, never clickable. */
+  textOnly: boolean;
   enabled: boolean;
 }
 
@@ -28,6 +36,14 @@ export interface PageSnapshot {
   elements: ExtractedElement[];
   /** True when extraction hit the cap and dropped low-priority elements. */
   truncated: boolean;
+  /**
+   * Parts of the page this walker cannot see. `document.querySelectorAll` does
+   * not cross iframe or shadow boundaries, so anything inside them is invisible
+   * to both resolution and healing — payment fields, embedded widgets and most
+   * web-component design systems live there. Counted so a baseline recorded
+   * against such a page can say so rather than quietly look complete.
+   */
+  unreachable: { iframes: number; shadowRoots: number };
 }
 
 export const REF_ATTRIBUTE = 'data-qa-ref';
@@ -87,6 +103,34 @@ export async function extractPage(page: Page, maxElements = 120): Promise<PageSn
         '[role="alert"]',
         '[role="status"]',
         ...TEST_ID_ATTRS.map((a) => `[${a}]`),
+      ].join(',');
+
+      // Text-bearing leaves. Assertions in real test cases are overwhelmingly
+      // about text — a total, a confirmation message, an error string — and none
+      // of that is interactive or a heading. Without this, an `assert` step
+      // targeting "the order total" has nothing to match and the whole test is
+      // unrecordable.
+      const TEXT_SELECTOR = [
+        'p',
+        'span',
+        'div',
+        'li',
+        'td',
+        'th',
+        'dd',
+        'dt',
+        'strong',
+        'em',
+        'b',
+        'small',
+        'label',
+        'code',
+        'time',
+        'output',
+        'figcaption',
+        'legend',
+        'h5',
+        'h6',
       ].join(',');
 
       const clean = (value: string | null | undefined, max = 200): string =>
@@ -198,6 +242,38 @@ export async function extractPage(page: Page, maxElements = 120): Promise<PageSn
         return null;
       };
 
+      /**
+       * The label for a value element, if it has one.
+       *
+       * Requires the preceding sibling to be a leaf with short text — a label is
+       * a short piece of text, not a container. Deliberately one relationship
+       * rather than a rule per tag: `<dt>`/`<dd>`, `<label>` and its field,
+       * `<th>`/`<td>` in a row and two sibling spans are all "the previous
+       * element sibling labels me".
+       *
+       * Returns the text verbatim, colon included, because the locator matches
+       * the label exactly and must agree with what is really in the DOM.
+       */
+      const labelAnchorOf = (el: Element): string | null => {
+        const previous = el.previousElementSibling;
+        if (!previous || previous.children.length > 0) return null;
+
+        // A label is inert text. A control that happens to precede this element
+        // labels nothing — two stacked buttons are not a label/value pair — and a
+        // heading names a whole section rather than the field beside it.
+        if (interactive.has(previous)) return null;
+        const previousTag = previous.tagName.toLowerCase();
+        if (/^h[1-6]$/.test(previousTag) || previous.getAttribute('role') === 'heading') {
+          return null;
+        }
+
+        const text = clean(previous.textContent, 80);
+        if (text.length === 0 || text.length > 60) return null;
+        // A quote would have to be escaped into the XPath; not worth the risk.
+        if (/["']/.test(text)) return null;
+        return text;
+      };
+
       /** Sibling text that helps a human tell two identical buttons apart. */
       const nearbyTextOf = (el: Element): string[] => {
         const parent = el.parentElement;
@@ -213,11 +289,25 @@ export async function extractPage(page: Page, maxElements = 120): Promise<PageSn
       };
 
       const interactive = new Set(Array.from(document.querySelectorAll(INTERACTIVE_SELECTOR)));
-      const content = Array.from(document.querySelectorAll(CONTENT_SELECTOR));
-      const all = [...interactive, ...content.filter((el) => !interactive.has(el))];
+      const content = Array.from(document.querySelectorAll(CONTENT_SELECTOR)).filter(
+        (el) => !interactive.has(el),
+      );
+      const contentSet = new Set(content);
+
+      // Leaves only: a wrapper's text is just its children's text concatenated,
+      // so collecting ancestors would bury the actual content under duplicates.
+      const textLeaves = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter((el) => {
+        if (interactive.has(el) || contentSet.has(el)) return false;
+        if (el.children.length > 0) return false;
+        const text = clean(el.textContent, 100);
+        return text.length > 0 && text.length <= 80;
+      });
+
+      const textLeafSet = new Set(textLeaves);
+      const all = [...interactive, ...content, ...textLeaves];
 
       const collected: Array<
-        Record<string, unknown> & { interactive: boolean }
+        Record<string, unknown> & { interactive: boolean; textOnly: boolean }
       > = [];
       let index = 0;
 
@@ -253,22 +343,34 @@ export async function extractPage(page: Page, maxElements = 120): Promise<PageSn
           altText: el.getAttribute('alt'),
           context: contextOf(el),
           nearbyText: nearbyTextOf(el),
+          labelAnchor: labelAnchorOf(el),
           interactive: interactive.has(el),
+          textOnly: textLeafSet.has(el),
           enabled: !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true',
         });
       }
 
-      // Interactive elements are the likelier targets, so they survive the cap.
+      // Three tiers, most likely target first, so the cap drops the least useful.
       const ranked = [
         ...collected.filter((e) => e.interactive),
-        ...collected.filter((e) => !e.interactive),
+        ...collected.filter((e) => !e.interactive && !e.textOnly),
+        ...collected.filter((e) => e.textOnly),
       ];
+
+      // Open shadow roots only — a closed one is unreachable even to count.
+      const shadowRoots = Array.from(document.querySelectorAll('*')).filter(
+        (el) => (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot,
+      ).length;
 
       return {
         url: window.location.href,
         title: document.title,
         elements: ranked.slice(0, cap),
         truncated: ranked.length > cap,
+        unreachable: {
+          iframes: document.querySelectorAll('iframe,frame').length,
+          shadowRoots,
+        },
       };
     },
     { refAttribute: REF_ATTRIBUTE, cap: maxElements, pass },
@@ -286,6 +388,7 @@ export function renderElementsForPrompt(snapshot: PageSnapshot): string {
     if (el.labelText && el.labelText !== el.accessibleName) parts.push(`label="${el.labelText}"`);
     if (el.id) parts.push(`id="${el.id}"`);
     if (el.context) parts.push(`in="${el.context}"`);
+    if (el.labelAnchor) parts.push(`labelledBy="${el.labelAnchor}"`);
     if (!el.enabled) parts.push('DISABLED');
     if (!el.interactive) parts.push('static');
     if (el.nearbyText.length > 0) parts.push(`near=[${el.nearbyText.join(' | ')}]`);
@@ -298,6 +401,9 @@ export function renderElementsForPrompt(snapshot: PageSnapshot): string {
     '',
     ...lines,
     snapshot.truncated ? '\n(element list was truncated)' : '',
+    snapshot.unreachable.iframes > 0 || snapshot.unreachable.shadowRoots > 0
+      ? `\n(not traversed: ${snapshot.unreachable.iframes} iframe(s), ${snapshot.unreachable.shadowRoots} shadow root(s))`
+      : '',
   ]
     .join('\n')
     .trim();

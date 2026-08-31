@@ -55,6 +55,20 @@ export function validatePlanRules(plan: GeneratedPlan, instruction: string): str
       );
     }
 
+    if (step.expectedValue !== null) {
+      if (step.action !== 'assert') {
+        errors.push(`${where}: expectedValue is only meaningful on an assert step.`);
+      }
+      // Grounded like sourcePhrase: an inferred value would pin the test to
+      // something the tester never asked for, failing on every data change.
+      if (!normalizedInstruction.includes(normalize(step.expectedValue))) {
+        errors.push(
+          `${where}: expectedValue "${step.expectedValue}" does not appear in the tester's ` +
+            'instruction. Use null unless they stated the value themselves.',
+        );
+      }
+    }
+
     // The grounding check: every step must quote the instruction it came from.
     // A step that cannot is one the model invented.
     if (!normalizedInstruction.includes(normalize(step.sourcePhrase))) {

@@ -2,13 +2,15 @@ import type { Page } from 'playwright';
 import type { PageSnapshot } from '../browser/extract.js';
 import { resolveLocators } from '../browser/locator.js';
 import type { Action } from '../intent/types.js';
-import type { BaselineOutcome, Locator } from './types.js';
+import type { Assertion, BaselineOutcome, Locator } from './types.js';
 
 export interface DeriveOutcomeParams {
   page: Page;
   action: Action;
   /** The step's own locator; null for steps that act on no element. */
   stepLocator: Locator | null;
+  /** Set only when the tester named a literal value for an assert step. */
+  expectedValue: string | null;
   intended: string | null;
   urlBefore: string;
   urlAfter: string;
@@ -17,50 +19,63 @@ export interface DeriveOutcomeParams {
 }
 
 /**
- * Turns the intent plan's prose expectation into a typed, checkable assertion —
+ * Turns the intent plan's prose expectation into typed, checkable assertions —
  * from what actually happened, not from what the model predicted.
  *
  * This is why baseline generation runs the flow for real. The plan may have said
- * "the checkout page is displayed"; only the browser knows that means `/checkout`.
- * The prose is kept in `intended` as context for the healer, but it is never what
- * gets asserted.
+ * "the checkout page is displayed"; only the browser knows that means `/checkout`
+ * and which element proves it rendered. The prose is kept in `intended` as
+ * context for the healer, but it is never what gets asserted.
+ *
+ * Assertions accumulate rather than compete: a click that navigated records both
+ * the URL and something that only exists on the destination, so "we got there"
+ * cannot pass on an error page served at the same path.
  */
 export async function deriveOutcome({
   page,
   action,
   stepLocator,
+  expectedValue,
   intended,
   urlBefore,
   urlAfter,
   before,
   after,
 }: DeriveOutcomeParams): Promise<BaselineOutcome> {
+  const assertions: Assertion[] = [];
+  const add = (type: Assertion['type'], value: string | null, locator: Locator | null) =>
+    assertions.push({ type, value, locator });
+
   // An assert step's post-condition is the thing it was asserting.
   if ((action === 'assert' || action === 'waitFor') && stepLocator) {
-    return { type: 'elementVisible', value: null, locator: stepLocator, intended };
+    add('elementVisible', null, stepLocator);
+
+    // Only when the tester named the value. Otherwise the test checks that a
+    // value is displayed, and a later data change is not a failure.
+    if (expectedValue !== null) add('textEquals', expectedValue, stepLocator);
+  }
+
+  // A fill's post-condition is that the field holds the value. The value itself
+  // is never recorded — it may be a password.
+  if (action === 'fill' && stepLocator) {
+    add('inputFilled', null, stepLocator);
   }
 
   const urlFragment = distinguishingUrlFragment(urlBefore, urlAfter);
-  if (urlFragment) {
-    return { type: 'urlContains', value: urlFragment, intended, locator: null };
+  if (urlFragment) add('urlContains', urlFragment, null);
+
+  // Something that was not on the page before: the destination's heading after a
+  // navigation, a badge that shows an item was added, a confirmation banner.
+  // Paired with the URL assertion this is what makes the outcome hard to satisfy
+  // accidentally.
+  if (assertions.length === 0 || urlFragment) {
+    const appeared = await firstAppearedLocator(page, before, after);
+    if (appeared) add('elementVisible', null, appeared);
   }
 
-  // A fill's post-condition is that the field holds the value. Checked before the
-  // appeared-element scan so a stray validation message cannot become the assertion.
-  if (action === 'fill' && stepLocator) {
-    return { type: 'inputFilled', value: null, locator: stepLocator, intended };
-  }
-
-  // No navigation, but something may still have appeared — the badge that shows
-  // an item was added, an inline error, a confirmation banner.
-  const appeared = await firstAppearedLocator(page, before, after);
-  if (appeared) {
-    return { type: 'elementVisible', value: null, locator: appeared, intended };
-  }
-
-  // Nothing observable changed. Recorded honestly rather than papered over with an
+  // An empty list is recorded honestly rather than papered over with an
   // assertion that would pass whatever the app does.
-  return { type: 'none', value: null, locator: null, intended };
+  return { assertions, intended };
 }
 
 /** The smallest part of the new URL that tells it apart from the old one. */
@@ -87,8 +102,8 @@ function distinguishingUrlFragment(urlBefore: string, urlAfter: string): string 
 
 /**
  * Finds an element present after the action but not before, and returns a
- * verified locator for it. Prefers static text (banners, counters, errors) over
- * controls, since those are what actually evidence a state change.
+ * verified locator for it. Prefers static text (banners, counters, headings)
+ * over controls, since those are what actually evidence a state change.
  */
 async function firstAppearedLocator(
   page: Page,

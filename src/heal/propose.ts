@@ -1,6 +1,6 @@
 import { renderElementsForPrompt, type PageSnapshot } from '../browser/extract.js';
 import { describeLocator } from '../browser/locator.js';
-import { generateJson } from '../llm/gemini.js';
+import { generateJson } from '../llm/openai.js';
 import type { BaselineStep } from '../baseline/types.js';
 import { healProposalSchema, type HealProposal } from './types.js';
 

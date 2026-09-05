@@ -1,12 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import type { z } from 'zod';
-import { GEMINI_MODEL, requireApiKey } from '../config.js';
+import { GEMINI_MODEL, requireGeminiKey } from '../config.js';
 import { toGeminiSchema } from './json-schema.js';
 
 let client: GoogleGenAI | undefined;
 
 function getClient(): GoogleGenAI {
-  client ??= new GoogleGenAI({ apiKey: requireApiKey() });
+  client ??= new GoogleGenAI({ apiKey: requireGeminiKey() });
   return client;
 }
 

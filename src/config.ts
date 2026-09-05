@@ -13,13 +13,22 @@ export const PATHS = {
 } as const;
 
 export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.7-flash';
+export const OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-5.6-terra';
 
-export function requireApiKey(): string {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    throw new Error('GEMINI_API_KEY is not set. Copy env.example to .env and add your key.');
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not set. Copy env.example to .env and add your key.`);
   }
-  return key;
+  return value;
+}
+
+export function requireGeminiKey(): string {
+  return requireEnv('GEMINI_API_KEY');
+}
+
+export function requireOpenAiKey(): string {
+  return requireEnv('OPENAI_API_KEY');
 }
 
 /**

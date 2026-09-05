@@ -1,4 +1,4 @@
-import { generateJson } from '../llm/gemini.js';
+import { generateJson } from '../llm/openai.js';
 import { buildPrompt, buildRepairPrompt, SYSTEM_INSTRUCTION } from './prompt.js';
 import { collectValueRefs, collectWarnings, validatePlanRules } from './validate.js';
 import { generatedPlanSchema, type GeneratedPlan, type IntentPlan } from './types.js';

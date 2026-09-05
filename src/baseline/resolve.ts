@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { generateJson } from '../llm/gemini.js';
+import { generateJson } from '../llm/openai.js';
 import { renderElementsForPrompt, type PageSnapshot } from '../browser/extract.js';
 import type { IntentStep } from '../intent/types.js';
 

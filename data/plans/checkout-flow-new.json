@@ -1,0 +1,96 @@
+{
+  "planId": "checkout-flow-new",
+  "createdAt": "2026-09-04T15:38:22.374Z",
+  "model": "gpt-5.6-terra",
+  "source": {
+    "targetUrl": "http://localhost:3000",
+    "instruction": "Log in, view the product, and proceed to checkout"
+  },
+  "plan": {
+    "name": "Login and Checkout",
+    "description": "Log in, view the product, and proceed to checkout.",
+    "steps": [
+      {
+        "id": "step-1",
+        "intent": "Enter the login email address.",
+        "sourcePhrase": "Log in",
+        "action": "fill",
+        "target": {
+          "description": "email input field",
+          "context": "login form"
+        },
+        "value": null,
+        "valueRef": "TEST_EMAIL",
+        "expectedValue": null,
+        "expectedOutcome": null
+      },
+      {
+        "id": "step-2",
+        "intent": "Enter the login password.",
+        "sourcePhrase": "Log in",
+        "action": "fill",
+        "target": {
+          "description": "password input field",
+          "context": "login form"
+        },
+        "value": null,
+        "valueRef": "TEST_PASSWORD",
+        "expectedValue": null,
+        "expectedOutcome": null
+      },
+      {
+        "id": "step-3",
+        "intent": "Submit the login form.",
+        "sourcePhrase": "Log in",
+        "action": "click",
+        "target": {
+          "description": "sign in button",
+          "context": "login form"
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedValue": null,
+        "expectedOutcome": {
+          "description": "the user is logged in"
+        }
+      },
+      {
+        "id": "step-4",
+        "intent": "Verify that the product is visible.",
+        "sourcePhrase": "view the product",
+        "action": "assert",
+        "target": {
+          "description": "product",
+          "context": null
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedValue": null,
+        "expectedOutcome": {
+          "description": "the product is shown"
+        }
+      },
+      {
+        "id": "step-5",
+        "intent": "Proceed to checkout.",
+        "sourcePhrase": "proceed to checkout",
+        "action": "click",
+        "target": {
+          "description": "proceed to checkout button",
+          "context": null
+        },
+        "value": null,
+        "valueRef": null,
+        "expectedValue": null,
+        "expectedOutcome": {
+          "description": "the checkout process is started"
+        }
+      }
+    ],
+    "startUrl": "http://localhost:3000",
+    "requiredValueRefs": [
+      "TEST_EMAIL",
+      "TEST_PASSWORD"
+    ]
+  }
+}
